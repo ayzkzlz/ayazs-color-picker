@@ -10,6 +10,8 @@ ipcRenderer.on('set-image', (event, imageUri) => {
     canvas.height = window.innerHeight;
     // Resmi ekran boyutlarına sığdırarak çiz
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // Çizim bittiğinde ana pencereye göster komutu yolla
+    ipcRenderer.send('ready-to-show');
   };
   img.src = imageUri;
 });

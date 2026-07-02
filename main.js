@@ -31,6 +31,8 @@ function captureScreenAndShowPicker() {
       transparent: true,
       alwaysOnTop: true,
       skipTaskbar: true,
+      show: false, // Pencereyi resim çizilene kadar gizle
+      enableLargerThanScreen: true,
       webPreferences: {
         nodeIntegration: true,
         contextIsolation: false
@@ -94,5 +96,11 @@ ipcMain.on('color-picked', (event, hexColor) => {
 ipcMain.on('close-picker', () => {
   if (pickerWindow) {
     pickerWindow.close();
+  }
+});
+
+ipcMain.on('ready-to-show', () => {
+  if (pickerWindow) {
+    pickerWindow.show();
   }
 });
