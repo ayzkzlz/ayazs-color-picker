@@ -3,48 +3,57 @@ const { ipcRenderer } = require('electron');
 const canvas = document.getElementById('screen-canvas');
 const ctx = canvas.getContext('2d');
 
-ipcRenderer.on('set-image', (event, imageUri) => {
+ipcRenderer.on('start-picking', (event, imageUri, screenBounds) => {
   const img = new Image();
   img.onload = () => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    // Resmi ekran boyutlarına sığdırarak çiz
+    // Ekran boyutunu birebir kullan
+    canvas.width = screenBounds.width;
+    canvas.height = screenBounds.height;
+    
+    // Resmi çizdiğimiz an, şeffaflık ortadan kalkar ve arkadaki uygulamalar erişilmez olur.
+    // Ancak resim gerçek ekranla birebir aynı olduğu için kullanıcı fark etmez.
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    // Çizim bittiğinde ana pencereye göster komutu yolla
-    ipcRenderer.send('ready-to-show');
+    
+    document.body.classList.add('picking');
+    
+    // Main prosese artık tıklamaları yakalayabileceğini söyle
+    ipcRenderer.send('picking-ready');
   };
   img.src = imageUri;
 });
 
-canvas.addEventListener('mousedown', (e) => {
+function endPicking() {
+  document.body.classList.remove('picking');
+  // Canvas'ı temizle ki tekrar şeffaf olsun
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ipcRenderer.send('stop-picking');
+}
+
+document.body.addEventListener('mousedown', (e) => {
+  if (!document.body.classList.contains('picking')) return;
+  
   if (e.button === 0) { // Sol tık
-    const x = e.clientX;
-    const y = e.clientY;
-    
-    // Tıklanan pikselin verisini al
-    const pixelData = ctx.getImageData(x, y, 1, 1).data;
+    // Tıklanan yerin rengini direkt çizili canvas'tan al
+    const pixelData = ctx.getImageData(e.clientX, e.clientY, 1, 1).data;
     const r = pixelData[0];
     const g = pixelData[1];
     const b = pixelData[2];
     
-    // RGB to Hex
     const rgbToHex = (r, g, b) => '#' + [r, g, b].map(x => {
       const hex = x.toString(16);
       return hex.length === 1 ? '0' + hex : hex;
     }).join('').toUpperCase();
     
     const hexColor = rgbToHex(r, g, b);
-    
-    // Rengi ana prosese (main.js) gönder
     ipcRenderer.send('color-picked', hexColor);
-  } else if (e.button === 2) { // Sağ tık yaparsa işlemi iptal et
-    ipcRenderer.send('close-picker');
   }
+  
+  // İşlem bitince (veya sağ tıkla iptal edilince) kapat
+  endPicking();
 });
 
-// ESC tuşu ile işlemi iptal et
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    ipcRenderer.send('close-picker');
+  if (e.key === 'Escape' && document.body.classList.contains('picking')) {
+    endPicking();
   }
 });

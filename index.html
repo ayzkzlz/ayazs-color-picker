@@ -9,16 +9,22 @@
       width: 100vw;
       height: 100vh;
       overflow: hidden;
-      cursor: crosshair;
-      background-color: transparent;
+      background-color: transparent; /* TAMAMEN GÖRÜNMEZ */
+      cursor: default;
     }
+    body.picking {
+      cursor: crosshair !important;
+    }
+    /* Sadece menü açıkken canvas görünür olur, böylece alttaki uygulamalar tıklanmaz */
     canvas {
+      display: none;
+    }
+    body.picking canvas {
       display: block;
     }
   </style>
 </head>
 <body>
-  <!-- Ekran görüntüsünü buraya çizeceğiz -->
   <canvas id="screen-canvas"></canvas>
   <script src="renderer.js"></script>
 </body>

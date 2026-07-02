@@ -3,60 +3,48 @@ const { app, BrowserWindow, globalShortcut, desktopCapturer, ipcMain, clipboard,
 let tray = null;
 let pickerWindow = null;
 
-function captureScreenAndShowPicker() {
-  if (pickerWindow) return; // Zaten açıksa işlem yapma
-
+function createPickerWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.size;
-  const scaleFactor = primaryDisplay.scaleFactor;
+  const { width, height } = primaryDisplay.bounds;
 
-  // Ekranın anlık görüntüsünü alıyoruz
-  desktopCapturer.getSources({ 
-    types: ['screen'], 
-    thumbnailSize: { 
-      width: width * scaleFactor, 
-      height: height * scaleFactor 
-    } 
-  }).then(async sources => {
-    const source = sources[0]; // Ana ekranı seç
-    const imageUri = source.thumbnail.toDataURL();
+  pickerWindow = new BrowserWindow({
+    x: primaryDisplay.bounds.x,
+    y: primaryDisplay.bounds.y,
+    width: width,
+    height: height,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: false,
+    roundedCorners: false,
+    resizable: false,
+    movable: false,
+    fullscreenable: false,
+    thickFrame: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
 
-    // Tam ekran, şeffaf bir çerçevesiz pencere oluştur
-    pickerWindow = new BrowserWindow({
-      width: width,
-      height: height,
-      x: primaryDisplay.bounds.x,
-      y: primaryDisplay.bounds.y,
-      frame: false,
-      transparent: true,
-      alwaysOnTop: true,
-      skipTaskbar: true,
-      show: false, // Pencereyi resim çizilene kadar gizle
-      enableLargerThanScreen: true,
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false
-      }
-    });
+  // Windows'ta görev çubuğu menüleri (thumbnail) en üst katmanda (z-index) yer alır.
+  // Bizim penceremizin bunların da üstüne çıkabilmesi için 'screen-saver' seviyesini kullanıyoruz.
+  pickerWindow.setAlwaysOnTop(true, 'screen-saver');
 
-    pickerWindow.loadFile('index.html');
-    
-    // Pencere yüklendiğinde alınan ekran görüntüsünü arayüze gönder
-    pickerWindow.webContents.on('did-finish-load', () => {
-      pickerWindow.webContents.send('set-image', imageUri);
-    });
+  pickerWindow.loadFile('index.html');
+  // Başlangıçta fare tıklamalarını tamamen yok sayarak arkadaki uygulamalara geçirir (görünmez pencere)
+  pickerWindow.setIgnoreMouseEvents(true, { forward: true });
 
-    pickerWindow.on('closed', () => {
-      pickerWindow = null;
-    });
-  }).catch(err => {
-    console.error("Ekran yakalama hatası:", err);
+  pickerWindow.on('closed', () => {
+    pickerWindow = null;
   });
 }
 
 app.whenReady().then(() => {
-  // Sistem tepsisi (Tray) ikonu
-  const icon = nativeImage.createEmpty(); // Şimdilik boş bir ikon
+  createPickerWindow();
+
+  const icon = nativeImage.createEmpty();
   tray = new Tray(icon);
   tray.setToolTip('Color Picker App');
   const contextMenu = Menu.buildFromTemplate([
@@ -64,43 +52,61 @@ app.whenReady().then(() => {
   ]);
   tray.setContextMenu(contextMenu);
 
-  // Kısayol kaydı
-  const ret = globalShortcut.register('CommandOrControl+Alt+H', () => {
-    captureScreenAndShowPicker();
+  const ret = globalShortcut.register('CommandOrControl+Shift+H', async () => {
+    if (pickerWindow) {
+      try {
+        const primaryDisplay = screen.getPrimaryDisplay();
+        const { width, height } = primaryDisplay.size;
+        const scaleFactor = primaryDisplay.scaleFactor;
+
+        // Kısayola basıldığı an ekranı dondurmak için resmi çekiyoruz
+        const sources = await desktopCapturer.getSources({ 
+          types: ['screen'], 
+          thumbnailSize: { 
+            width: width * scaleFactor, 
+            height: height * scaleFactor 
+          } 
+        });
+        
+        const source = sources[0];
+        const imageUri = source.thumbnail.toDataURL();
+
+        pickerWindow.webContents.send('start-picking', imageUri, { width, height });
+      } catch (err) {
+        console.error("Ekran yakalama hatasi:", err);
+      }
+    }
   });
 
   if (!ret) {
-    console.log('Kısayol kaydı başarısız oldu.');
+    console.log('Kisayol kaydi basarisiz oldu.');
   } else {
-    console.log('Kısayol başarıyla kaydedildi: Ctrl+Alt+H veya Cmd+Alt+H');
+    console.log('Uygulama hazir! Kisayol: Ctrl + Shift + H');
   }
 });
 
 app.on('window-all-closed', () => {
-  // Arka planda çalışması için uygulamayı kapatmıyoruz
+  // Arka planda kalmaya devam et
 });
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
 });
 
-// IPC Dinleyicileri (Arayüzden gelen mesajları yakalar)
+ipcMain.on('picking-ready', () => {
+  // Resim arayüze çizildiği an artık fare tıklamalarını KENDİSİ yakalamalı (arkaya geçirmemeli)
+  if (pickerWindow) {
+    pickerWindow.setIgnoreMouseEvents(false);
+  }
+});
+
+ipcMain.on('stop-picking', () => {
+  if (pickerWindow) {
+    pickerWindow.setIgnoreMouseEvents(true, { forward: true });
+  }
+});
+
 ipcMain.on('color-picked', (event, hexColor) => {
   clipboard.writeText(hexColor);
-  console.log(`Kopyalandı: ${hexColor}`);
-  if (pickerWindow) {
-    pickerWindow.close();
-  }
-});
-
-ipcMain.on('close-picker', () => {
-  if (pickerWindow) {
-    pickerWindow.close();
-  }
-});
-
-ipcMain.on('ready-to-show', () => {
-  if (pickerWindow) {
-    pickerWindow.show();
-  }
+  console.log(`Kopyalandi: ${hexColor}`);
 });
