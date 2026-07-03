@@ -1,4 +1,5 @@
 const { app, BrowserWindow, globalShortcut, desktopCapturer, ipcMain, clipboard, Tray, Menu, screen, nativeImage } = require('electron');
+const path = require('path');
 
 let tray = null;
 let pickerWindow = null;
@@ -22,6 +23,7 @@ function createPickerWindow() {
   const { x, y, width, height } = getTotalBounds();
 
   pickerWindow = new BrowserWindow({
+    icon: path.join(__dirname, 'icon.png'),
     x: x,
     y: y,
     width: width,
@@ -60,8 +62,23 @@ function createPickerWindow() {
 app.whenReady().then(() => {
   createPickerWindow();
 
-  const icon = nativeImage.createEmpty();
-  tray = new Tray(icon);
+  const iconPath = path.join(__dirname, 'icon.png');
+  let trayIcon = nativeImage.createFromPath(iconPath);
+  
+  const size = trayIcon.getSize();
+  // Eğer resim tam kare değilse (örneğin dikdörtgense), Windows onu kareye sığdırmak için ezer.
+  // Bunu engellemek için resmin tam ortasından kare olacak şekilde kırpıyoruz.
+  if (size.width !== size.height && size.width > 0 && size.height > 0) {
+    const min = Math.min(size.width, size.height);
+    const x = Math.floor((size.width - min) / 2);
+    const y = Math.floor((size.height - min) / 2);
+    trayIcon = trayIcon.crop({ x, y, width: min, height: min });
+  }
+
+  // Kare olan resmi standart tepsi boyutuna küçültüyoruz
+  trayIcon = trayIcon.resize({ width: 32, height: 32 });
+  
+  tray = new Tray(trayIcon);
   tray.setToolTip('Color Picker App');
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Çıkış', click: () => { app.quit(); } }
