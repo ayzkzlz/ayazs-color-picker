@@ -13,9 +13,15 @@ const lensHex = document.getElementById('lens-hex');
 
 lensCtx.imageSmoothingEnabled = false;
 
-ipcRenderer.on('start-picking', (event, screensData, totalBounds) => {
+ipcRenderer.on('start-picking', (event, screensData, totalBounds, lensEnabled) => {
   globalScreensData = screensData;
   globalTotalBounds = totalBounds;
+  
+  if (lensEnabled) {
+    document.body.classList.add('lens-enabled');
+  } else {
+    document.body.classList.remove('lens-enabled');
+  }
   // Tuvali tüm monitörlerin toplam alanına göre ayarla
   canvas.width = totalBounds.width;
   canvas.height = totalBounds.height;
@@ -61,6 +67,8 @@ document.body.addEventListener('mousemove', (e) => {
   if (!document.body.classList.contains('picking') || document.body.classList.contains('dimmed')) {
     return;
   }
+  
+  if (!document.body.classList.contains('lens-enabled')) return;
 
   const x = e.clientX;
   const y = e.clientY;

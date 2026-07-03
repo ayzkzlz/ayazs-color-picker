@@ -9,17 +9,39 @@ let settingsWindow = null;
 // Ayarları kaydetmek için dosya yolu
 const configPath = path.join(app.getPath('userData'), 'config.json');
 let currentShortcut = 'CommandOrControl+Shift+H'; // Varsayılan
+let lensEnabled = true;
 
 // Eğer ayar dosyası varsa oku
 if (fs.existsSync(configPath)) {
   try {
-    const data = fs.readFileSync(configPath, 'utf8');
-    currentShortcut = JSON.parse(data).shortcut || currentShortcut;
+    const data = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    currentShortcut = data.shortcut || currentShortcut;
+    if (data.lensEnabled !== undefined) {
+      lensEnabled = data.lensEnabled;
+    }
   } catch(e) {}
 }
 
 function saveConfig() {
-  fs.writeFileSync(configPath, JSON.stringify({ shortcut: currentShortcut }));
+  fs.writeFileSync(configPath, JSON.stringify({ shortcut: currentShortcut, lensEnabled }));
+}
+
+function updateTrayMenu() {
+  if (!tray) return;
+  const contextMenu = Menu.buildFromTemplate([
+    { label: 'Kısayolu Yönet', click: () => openSettings() },
+    { 
+      label: lensEnabled ? 'Lensi Kapat' : 'Lensi Aç', 
+      click: () => {
+        lensEnabled = !lensEnabled;
+        saveConfig();
+        updateTrayMenu();
+      }
+    },
+    { type: 'separator' },
+    { label: 'Çıkış', click: () => { app.quit(); } }
+  ]);
+  tray.setContextMenu(contextMenu);
 }
 
 function getTotalBounds() {
@@ -147,7 +169,7 @@ const handleHotkey = async () => {
         };
       });
 
-      pickerWindow.webContents.send('start-picking', screensData, { x: totalX, y: totalY, width: totalWidth, height: totalHeight });
+      pickerWindow.webContents.send('start-picking', screensData, { x: totalX, y: totalY, width: totalWidth, height: totalHeight }, lensEnabled);
     } catch (err) {
       console.error("Ekran yakalama hatasi:", err);
     }
@@ -172,14 +194,9 @@ app.whenReady().then(() => {
   trayIcon = trayIcon.resize({ width: 32, height: 32 }); // Windows için tray boyutuna optimize edildi
   
   tray = new Tray(trayIcon);
-  tray.setToolTip('Color Picker App');
+  tray.setToolTip('Global Color Picker');
   
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Ayarlar', click: () => openSettings() },
-    { type: 'separator' },
-    { label: 'Çıkış', click: () => { app.quit(); } }
-  ]);
-  tray.setContextMenu(contextMenu);
+  updateTrayMenu();
 
   registerShortcut();
 });
