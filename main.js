@@ -142,7 +142,12 @@ function openSettings() {
   });
 }
 
+let isPicking = false;
+
 const handleHotkey = async () => {
+  if (isPicking) return; // Zaten seçim işlemi sürüyorsa (veya başlıyorsa) yoksay
+  isPicking = true;
+
   if (pickerWindow) {
     try {
       const { x: totalX, y: totalY, width: totalWidth, height: totalHeight, displays } = getTotalBounds();
@@ -171,8 +176,11 @@ const handleHotkey = async () => {
 
       pickerWindow.webContents.send('start-picking', screensData, { x: totalX, y: totalY, width: totalWidth, height: totalHeight }, lensEnabled);
     } catch (err) {
+      isPicking = false;
       console.error("Ekran yakalama hatasi:", err);
     }
+  } else {
+    isPicking = false;
   }
 };
 
@@ -191,7 +199,13 @@ app.whenReady().then(() => {
 
   const iconPath = path.join(__dirname, 'icon.png');
   let trayIcon = nativeImage.createFromPath(iconPath);
-  trayIcon = trayIcon.resize({ width: 32, height: 32 }); // Windows için tray boyutuna optimize edildi
+  
+  if (process.platform === 'darwin') {
+    app.dock.hide(); // Mac'te dock'tan gizle, sadece tray'de çalışsın
+    trayIcon = trayIcon.resize({ width: 16, height: 16 }); // Mac tray menüsü için uygun boyut
+  } else {
+    trayIcon = trayIcon.resize({ width: 32, height: 32 }); // Windows için tray boyutuna optimize edildi
+  }
   
   tray = new Tray(trayIcon);
   tray.setToolTip('Global Color Picker');
@@ -199,6 +213,12 @@ app.whenReady().then(() => {
   updateTrayMenu();
 
   registerShortcut();
+
+  // İşletim sistemi başladığında otomatik çalıştır
+  app.setLoginItemSettings({
+    openAtLogin: true,
+    openAsHidden: true // Mac için arka planda sessizce açılmasını sağlar
+  });
 });
 
 app.on('window-all-closed', () => {
@@ -216,6 +236,7 @@ ipcMain.on('picking-ready', () => {
 });
 
 ipcMain.on('stop-picking', () => {
+  isPicking = false;
   if (pickerWindow) {
     pickerWindow.setIgnoreMouseEvents(true, { forward: true });
   }
