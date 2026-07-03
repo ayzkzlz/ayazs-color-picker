@@ -2,10 +2,23 @@ const { ipcRenderer } = require('electron');
 
 const input = document.getElementById('shortcut-input');
 let shortcutStr = '';
+const isMac = navigator.userAgent.toLowerCase().indexOf('mac') !== -1;
+
+function formatDisplay(str) {
+  if (isMac) {
+    return str.replace(/CommandOrControl|CmdOrCtrl/g, 'Cmd')
+              .replace(/Command|Super/g, 'Cmd')
+              .replace(/Control/g, 'Ctrl');
+  } else {
+    return str.replace(/CommandOrControl|CmdOrCtrl/g, 'Ctrl')
+              .replace(/Command|Super/g, 'Win')
+              .replace(/Control/g, 'Ctrl');
+  }
+}
 
 ipcRenderer.on('current-shortcut', (e, shortcut) => {
-  input.value = shortcut.replace(/CommandOrControl/g, 'Ctrl');
   shortcutStr = shortcut;
+  input.value = formatDisplay(shortcut);
   input.focus();
 });
 
@@ -30,10 +43,10 @@ input.addEventListener('keydown', (e) => {
   
   let parts = [];
   
-  if (e.ctrlKey) parts.push('CommandOrControl');
+  if (e.metaKey) parts.push(isMac ? 'Cmd' : 'Super');
+  if (e.ctrlKey) parts.push('Ctrl');
   if (e.altKey) parts.push('Alt');
   if (e.shiftKey) parts.push('Shift');
-  if (e.metaKey) parts.push('Super');
   
   let k = key.toUpperCase();
   if (!['CONTROL', 'ALT', 'SHIFT', 'META', 'ENTER'].includes(k)) {
@@ -48,5 +61,5 @@ input.addEventListener('keydown', (e) => {
   
   parts = [...new Set(parts)];
   shortcutStr = parts.join('+');
-  input.value = shortcutStr.replace(/CommandOrControl/g, 'Ctrl');
+  input.value = formatDisplay(shortcutStr);
 });

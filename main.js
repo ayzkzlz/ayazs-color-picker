@@ -8,7 +8,7 @@ let settingsWindow = null;
 
 // Ayarları kaydetmek için dosya yolu
 const configPath = path.join(app.getPath('userData'), 'config.json');
-let currentShortcut = 'CommandOrControl+Shift+H'; // Varsayılan
+let currentShortcut = 'CmdOrCtrl+Shift+X'; // Mac'te çakışmayan varsayılan
 let lensEnabled = true;
 
 // Eğer ayar dosyası varsa oku
