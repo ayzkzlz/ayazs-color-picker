@@ -1,10 +1,27 @@
 const { app, BrowserWindow, globalShortcut, desktopCapturer, ipcMain, clipboard, Tray, Menu, screen, nativeImage } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 let tray = null;
 let pickerWindow = null;
+let settingsWindow = null;
 
-// Birden fazla ekran varsa tüm ekranları kapsayacak ortak bir koordinat ve boyut hesaplar
+// Ayarları kaydetmek için dosya yolu
+const configPath = path.join(app.getPath('userData'), 'config.json');
+let currentShortcut = 'CommandOrControl+Shift+H'; // Varsayılan
+
+// Eğer ayar dosyası varsa oku
+if (fs.existsSync(configPath)) {
+  try {
+    const data = fs.readFileSync(configPath, 'utf8');
+    currentShortcut = JSON.parse(data).shortcut || currentShortcut;
+  } catch(e) {}
+}
+
+function saveConfig() {
+  fs.writeFileSync(configPath, JSON.stringify({ shortcut: currentShortcut }));
+}
+
 function getTotalBounds() {
   const displays = screen.getAllDisplays();
   let minX = 0, minY = 0, maxX = 0, maxY = 0;
@@ -23,11 +40,11 @@ function createPickerWindow() {
   const { x, y, width, height } = getTotalBounds();
 
   pickerWindow = new BrowserWindow({
-    icon: path.join(__dirname, 'icon.png'),
     x: x,
     y: y,
     width: width,
-    height: height + 1, // Windows görev çubuğunu (taskbar) aşması ve animasyon yapmaması için +1px hack
+    height: height + 1,
+    icon: path.join(__dirname, 'icon.ico'),
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -39,19 +56,17 @@ function createPickerWindow() {
     fullscreenable: false,
     thickFrame: false,
     enableLargerThanScreen: true,
-    type: 'toolbar', // İşletim sistemine bu pencerenin özel bir araç olduğunu söyler
+    type: 'toolbar',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
     }
   });
 
-  // Görev çubuğunun ve tüm alt menülerin kesinlikle üstünde olmak için
   pickerWindow.setBounds({ x, y, width, height: height + 1 });
   pickerWindow.setAlwaysOnTop(true, 'screen-saver');
 
   pickerWindow.loadFile('index.html');
-  // Başlangıçta fare tıklamalarını tamamen yok sayarak arkadaki uygulamalara geçirir
   pickerWindow.setIgnoreMouseEvents(true, { forward: true });
 
   pickerWindow.on('closed', () => {
@@ -59,74 +74,101 @@ function createPickerWindow() {
   });
 }
 
+function openSettings() {
+  if (settingsWindow) {
+    settingsWindow.focus();
+    return;
+  }
+  
+  settingsWindow = new BrowserWindow({
+    width: 320,
+    height: 130,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+  
+  settingsWindow.loadFile('settings.html');
+  
+  settingsWindow.webContents.on('did-finish-load', () => {
+    settingsWindow.webContents.send('current-shortcut', currentShortcut);
+  });
+  
+  // Ekranda başka yere tıklanırsa ayarlar menüsünü direkt kapat (minimalist davranış)
+  settingsWindow.on('blur', () => {
+    if (settingsWindow) settingsWindow.close();
+  });
+
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+}
+
+const handleHotkey = async () => {
+  if (pickerWindow) {
+    try {
+      const { x: totalX, y: totalY, width: totalWidth, height: totalHeight, displays } = getTotalBounds();
+
+      let maxW = 0; let maxH = 0;
+      displays.forEach(d => {
+         const w = d.size.width * d.scaleFactor;
+         const h = d.size.height * d.scaleFactor;
+         if (w > maxW) maxW = w;
+         if (h > maxH) maxH = h;
+      });
+
+      const sources = await desktopCapturer.getSources({ 
+        types: ['screen'], 
+        thumbnailSize: { width: maxW, height: maxH } 
+      });
+      
+      const screensData = displays.map((d, index) => {
+        let source = sources.find(s => s.display_id === d.id.toString());
+        if (!source) source = sources[index]; 
+        return {
+           imageUri: source.thumbnail.toDataURL(),
+           bounds: d.bounds
+        };
+      });
+
+      pickerWindow.webContents.send('start-picking', screensData, { x: totalX, y: totalY, width: totalWidth, height: totalHeight });
+    } catch (err) {
+      console.error("Ekran yakalama hatasi:", err);
+    }
+  }
+};
+
+function registerShortcut() {
+  globalShortcut.unregisterAll();
+  const ret = globalShortcut.register(currentShortcut, handleHotkey);
+  if (!ret) {
+    console.log('Kisayol kaydi basarisiz oldu:', currentShortcut);
+  } else {
+    console.log('Uygulama hazir! Kisayol:', currentShortcut);
+  }
+}
+
 app.whenReady().then(() => {
   createPickerWindow();
 
-  const iconPath = path.join(__dirname, 'icon.png');
-  let trayIcon = nativeImage.createFromPath(iconPath);
-  
-  const size = trayIcon.getSize();
-  // Eğer resim tam kare değilse (örneğin dikdörtgense), Windows onu kareye sığdırmak için ezer.
-  // Bunu engellemek için resmin tam ortasından kare olacak şekilde kırpıyoruz.
-  if (size.width !== size.height && size.width > 0 && size.height > 0) {
-    const min = Math.min(size.width, size.height);
-    const x = Math.floor((size.width - min) / 2);
-    const y = Math.floor((size.height - min) / 2);
-    trayIcon = trayIcon.crop({ x, y, width: min, height: min });
-  }
-
-  // Kare olan resmi standart tepsi boyutuna küçültüyoruz
-  trayIcon = trayIcon.resize({ width: 32, height: 32 });
-  
-  tray = new Tray(trayIcon);
+  const iconPath = path.join(__dirname, 'icon.ico');
+  tray = new Tray(iconPath);
   tray.setToolTip('Color Picker App');
+  
   const contextMenu = Menu.buildFromTemplate([
+    { label: 'Ayarlar', click: () => openSettings() },
+    { type: 'separator' },
     { label: 'Çıkış', click: () => { app.quit(); } }
   ]);
   tray.setContextMenu(contextMenu);
 
-  const ret = globalShortcut.register('CommandOrControl+Shift+H', async () => {
-    if (pickerWindow) {
-      try {
-        const { x: totalX, y: totalY, width: totalWidth, height: totalHeight, displays } = getTotalBounds();
-
-        // En büyük ekranın çözünürlüğüne göre kaliteyi ayarla
-        let maxW = 0; let maxH = 0;
-        displays.forEach(d => {
-           const w = d.size.width * d.scaleFactor;
-           const h = d.size.height * d.scaleFactor;
-           if (w > maxW) maxW = w;
-           if (h > maxH) maxH = h;
-        });
-
-        // Tüm ekranların resmini çek
-        const sources = await desktopCapturer.getSources({ 
-          types: ['screen'], 
-          thumbnailSize: { width: maxW, height: maxH } 
-        });
-        
-        // Her ekranın resmiyle o ekranın kendi koordinatlarını eşleştir
-        const screensData = displays.map((d, index) => {
-          let source = sources.find(s => s.display_id === d.id.toString());
-          if (!source) source = sources[index]; // Fallback
-          return {
-             imageUri: source.thumbnail.toDataURL(),
-             bounds: d.bounds
-          };
-        });
-
-        pickerWindow.webContents.send('start-picking', screensData, { x: totalX, y: totalY, width: totalWidth, height: totalHeight });
-      } catch (err) {
-        console.error("Ekran yakalama hatasi:", err);
-      }
-    }
-  });
-
-  if (!ret) {
-    console.log('Kisayol kaydi basarisiz oldu.');
-  } else {
-    console.log('Uygulama hazir! Kisayol: Ctrl + Shift + H');
-  }
+  registerShortcut();
 });
 
 app.on('window-all-closed', () => {
@@ -152,4 +194,19 @@ ipcMain.on('stop-picking', () => {
 ipcMain.on('color-picked', (event, hexColor) => {
   clipboard.writeText(hexColor);
   console.log(`Kopyalandi: ${hexColor}`);
+});
+
+ipcMain.on('update-shortcut', (event, newShortcut) => {
+  currentShortcut = newShortcut;
+  saveConfig();
+  registerShortcut();
+  if (settingsWindow) {
+    settingsWindow.close();
+  }
+});
+
+ipcMain.on('close-settings', () => {
+  if (settingsWindow) {
+    settingsWindow.close();
+  }
 });
