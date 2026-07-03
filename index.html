@@ -23,13 +23,75 @@
     canvas {
       display: none;
     }
-    body.picking canvas {
+    body.picking canvas#screen-canvas {
       display: block;
+    }
+
+    #lens-container {
+      position: absolute;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      background: rgba(15, 15, 15, 0.95);
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+      z-index: 1000;
+      pointer-events: none;
+    }
+
+    body.picking #lens-container {
+      display: flex;
+    }
+
+    #lens-canvas {
+      display: block !important;
+      width: 105px;
+      height: 105px;
+      border-radius: 50%;
+      image-rendering: pixelated;
+    }
+
+    #lens-crosshair {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #lens-crosshair::after {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border: 1px solid #ff4444;
+      box-sizing: border-box;
+    }
+
+    #lens-hex {
+      margin-top: 12px;
+      color: #fff;
+      font-family: monospace;
+      font-size: 16px;
+      font-weight: bold;
+      letter-spacing: 1px;
     }
   </style>
 </head>
 <body>
   <canvas id="screen-canvas"></canvas>
+
+  <div id="lens-container">
+    <div style="position: relative;">
+      <canvas id="lens-canvas" width="105" height="105"></canvas>
+      <div id="lens-crosshair"></div>
+    </div>
+    <div id="lens-hex">#FFFFFF</div>
+  </div>
+
   <script src="renderer.js"></script>
 </body>
 </html>

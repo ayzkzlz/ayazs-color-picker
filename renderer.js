@@ -3,7 +3,19 @@ const { ipcRenderer } = require('electron');
 const canvas = document.getElementById('screen-canvas');
 const ctx = canvas.getContext('2d');
 
+let globalScreensData = null;
+let globalTotalBounds = null;
+
+const lensContainer = document.getElementById('lens-container');
+const lensCanvas = document.getElementById('lens-canvas');
+const lensCtx = lensCanvas.getContext('2d');
+const lensHex = document.getElementById('lens-hex');
+
+lensCtx.imageSmoothingEnabled = false;
+
 ipcRenderer.on('start-picking', (event, screensData, totalBounds) => {
+  globalScreensData = screensData;
+  globalTotalBounds = totalBounds;
   // Tuvali tüm monitörlerin toplam alanına göre ayarla
   canvas.width = totalBounds.width;
   canvas.height = totalBounds.height;
@@ -43,6 +55,61 @@ ipcRenderer.on('toggle-dim', (event, show) => {
   } else {
     document.body.classList.remove('dimmed');
   }
+});
+
+document.body.addEventListener('mousemove', (e) => {
+  if (!document.body.classList.contains('picking') || document.body.classList.contains('dimmed')) {
+    return;
+  }
+
+  const x = e.clientX;
+  const y = e.clientY;
+
+  // Lensi bulunduğu ekranın sağ alt köşesine konumlandır
+  if (globalScreensData && globalTotalBounds) {
+    let currentDisplay = globalScreensData.find(d => 
+      x >= d.bounds.x - globalTotalBounds.x && 
+      x <= d.bounds.x - globalTotalBounds.x + d.bounds.width &&
+      y >= d.bounds.y - globalTotalBounds.y &&
+      y <= d.bounds.y - globalTotalBounds.y + d.bounds.height
+    );
+
+    if (currentDisplay) {
+      // 24 piksel sağdan ve alttan boşluk
+      const right = currentDisplay.bounds.x - globalTotalBounds.x + currentDisplay.bounds.width - 24;
+      const bottom = currentDisplay.bounds.y - globalTotalBounds.y + currentDisplay.bounds.height - 24;
+
+      const width = lensContainer.offsetWidth || 135;
+      const height = lensContainer.offsetHeight || 165;
+      
+      lensContainer.style.left = (right - width) + 'px';
+      lensContainer.style.top = (bottom - height) + 'px';
+    }
+  }
+
+  // 15x15'lik bir alanı al (imleç tam ortada kalacak şekilde 7'şer piksel kenarlara)
+  const sourceSize = 15;
+  const sx = x - Math.floor(sourceSize / 2);
+  const sy = y - Math.floor(sourceSize / 2);
+
+  // Lensi siyah yap (out-of-bounds kenarlar temiz kalsın)
+  lensCtx.fillStyle = '#0F0F0F';
+  lensCtx.fillRect(0, 0, lensCanvas.width, lensCanvas.height);
+
+  lensCtx.drawImage(
+    canvas,
+    sx, sy, sourceSize, sourceSize,
+    0, 0, lensCanvas.width, lensCanvas.height
+  );
+
+  // HEX hesapla
+  const pixelData = ctx.getImageData(x, y, 1, 1).data;
+  const rgbToHex = (r, g, b) => '#' + [r, g, b].map(v => {
+    const hex = v.toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  }).join('').toUpperCase();
+  
+  lensHex.innerText = rgbToHex(pixelData[0], pixelData[1], pixelData[2]);
 });
 
 document.body.addEventListener('mousedown', (e) => {
