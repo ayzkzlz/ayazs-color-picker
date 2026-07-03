@@ -11,6 +11,10 @@
       overflow: hidden;
       background-color: transparent; /* TAMAMEN GÖRÜNMEZ */
       cursor: default;
+      transition: background-color 0.2s ease;
+    }
+    body.dimmed {
+      background-color: rgba(0, 0, 0, 0.7);
     }
     body.picking {
       cursor: crosshair !important;

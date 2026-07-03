@@ -44,7 +44,7 @@ function createPickerWindow() {
     y: y,
     width: width,
     height: height + 1,
-    icon: path.join(__dirname, 'icon.ico'),
+    icon: path.join(__dirname, 'icon.png'),
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -80,6 +80,11 @@ function openSettings() {
     return;
   }
   
+  if (pickerWindow) {
+    pickerWindow.setIgnoreMouseEvents(false);
+    pickerWindow.webContents.send('toggle-dim', true);
+  }
+
   settingsWindow = new BrowserWindow({
     width: 320,
     height: 130,
@@ -93,6 +98,8 @@ function openSettings() {
       contextIsolation: false
     }
   });
+
+  settingsWindow.setAlwaysOnTop(true, 'screen-saver');
   
   settingsWindow.loadFile('settings.html');
   
@@ -100,13 +107,16 @@ function openSettings() {
     settingsWindow.webContents.send('current-shortcut', currentShortcut);
   });
   
-  // Ekranda başka yere tıklanırsa ayarlar menüsünü direkt kapat (minimalist davranış)
   settingsWindow.on('blur', () => {
     if (settingsWindow) settingsWindow.close();
   });
 
   settingsWindow.on('closed', () => {
     settingsWindow = null;
+    if (pickerWindow) {
+      pickerWindow.setIgnoreMouseEvents(true, { forward: true });
+      pickerWindow.webContents.send('toggle-dim', false);
+    }
   });
 }
 
@@ -157,8 +167,11 @@ function registerShortcut() {
 app.whenReady().then(() => {
   createPickerWindow();
 
-  const iconPath = path.join(__dirname, 'icon.ico');
-  tray = new Tray(iconPath);
+  const iconPath = path.join(__dirname, 'icon.png');
+  let trayIcon = nativeImage.createFromPath(iconPath);
+  trayIcon = trayIcon.resize({ width: 32, height: 32 }); // Windows için tray boyutuna optimize edildi
+  
+  tray = new Tray(trayIcon);
   tray.setToolTip('Color Picker App');
   
   const contextMenu = Menu.buildFromTemplate([

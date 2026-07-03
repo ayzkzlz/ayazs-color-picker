@@ -37,7 +37,16 @@ function endPicking() {
   ipcRenderer.send('stop-picking');
 }
 
+ipcRenderer.on('toggle-dim', (event, show) => {
+  if (show) {
+    document.body.classList.add('dimmed');
+  } else {
+    document.body.classList.remove('dimmed');
+  }
+});
+
 document.body.addEventListener('mousedown', (e) => {
+  if (document.body.classList.contains('dimmed')) return;
   if (!document.body.classList.contains('picking')) return;
   
   if (e.button === 0) { // Sol tık
