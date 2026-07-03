@@ -150,7 +150,15 @@ const handleHotkey = async () => {
 
   if (pickerWindow) {
     try {
+      // MacOS Space/Sanal Masaüstü (üç parmak kaydırma) geçişlerinde pencere kaybolmasın diye
+      // her kısayola basıldığında pencereyi bulunulan ekrana ve en üste zorluyoruz.
+      pickerWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      pickerWindow.setAlwaysOnTop(true, 'screen-saver', 2);
+      
       const { x: totalX, y: totalY, width: totalWidth, height: totalHeight, displays } = getTotalBounds();
+      
+      // Monitör değişimi/çözünürlük değişimi ihtimaline karşı bounds'u da yeniliyoruz
+      pickerWindow.setBounds({ x: totalX, y: totalY, width: totalWidth, height: totalHeight + 1 });
 
       let maxW = 0; let maxH = 0;
       displays.forEach(d => {
