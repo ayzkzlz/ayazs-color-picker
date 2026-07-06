@@ -11,6 +11,11 @@ A lightweight, seamless, and cross-platform desktop color picker built with Elec
 - **Instant Clipboard:** Instantly copies the selected HEX code to your clipboard without any popups.
 
 ## Installation & Usage
+
+**For Regular Users:**
+You do not need to install Node.js or run any commands. Simply navigate to the **[Releases](../../releases)** page on GitHub, download the latest `.exe` (or `.dmg` for Mac) file, and run it. The application will automatically minimize to your system tray.
+
+**For Developers (Local Build):**
 ```bash
 # Install dependencies
 npm install
@@ -18,7 +23,8 @@ npm install
 # Run the app
 npm start
 ```
-By default, the hotkey is `Ctrl+Shift+H`. You can change this by right-clicking the tray icon and selecting "Ayarlar" (Settings).
+
+By default, the hotkey is `Ctrl+Shift+H`. You can change this by right-clicking the tray icon and selecting "Kısayolu Yönet" (Settings).
 
 ---
 
@@ -35,6 +41,11 @@ Electron.js ile geliştirilmiş hafif, pürüzsüz ve arka planda sessizce çal�
 - **Anında Kopyalama:** Tıkladığınız noktanın HEX kodunu hiçbir bildirim çıkarmadan saniyesinde panoya kopyalar.
 
 ## Kurulum ve Kullanım
+
+**Son Kullanıcılar İçin:**
+Herhangi bir kod veya komut çalıştırmanıza gerek yoktur. Sadece GitHub üzerindeki **[Releases (Sürümler)](../../releases)** sekmesine gidin, en güncel `.exe` (Mac için `.dmg`) dosyasını indirip çalıştırın. Uygulama sessizce sağ alt köşedeki (tepsi) yerini alacaktır.
+
+**Geliştiriciler İçin (Yerel Derleme):**
 ```bash
 # Bağımlılıkları yükleyin
 npm install
@@ -42,4 +53,5 @@ npm install
 # Uygulamayı başlatın
 npm start
 ```
-Varsayılan kısayol `Ctrl+Shift+H` olarak ayarlıdır. Sistem tepsisindeki (sağ alt) ikona sağ tıklayıp "Ayarlar" sekmesinden bunu dilediğiniz gibi değiştirebilirsiniz.
+
+Varsayılan kısayol `Ctrl+Shift+H` olarak ayarlıdır. Sistem tepsisindeki (sağ alt) ikona sağ tıklayıp "Kısayolu Yönet" sekmesinden bunu dilediğiniz gibi değiştirebilirsiniz.
