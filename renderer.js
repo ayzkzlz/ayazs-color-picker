@@ -10,6 +10,7 @@ const lensContainer = document.getElementById('lens-container');
 const lensCanvas = document.getElementById('lens-canvas');
 const lensCtx = lensCanvas.getContext('2d');
 const lensHex = document.getElementById('lens-hex');
+const customCrosshair = document.getElementById('custom-crosshair');
 
 lensCtx.imageSmoothingEnabled = false;
 
@@ -68,10 +69,14 @@ document.body.addEventListener('mousemove', (e) => {
     return;
   }
   
-  if (!document.body.classList.contains('lens-enabled')) return;
-
   const x = e.clientX;
   const y = e.clientY;
+
+  // Özel imleci konumlandır
+  customCrosshair.style.left = x + 'px';
+  customCrosshair.style.top = y + 'px';
+
+  if (!document.body.classList.contains('lens-enabled')) return;
 
   // Lensi bulunduğu ekranın sağ alt köşesine konumlandır
   if (globalScreensData && globalTotalBounds) {

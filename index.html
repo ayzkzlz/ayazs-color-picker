@@ -16,14 +16,49 @@
     body.dimmed {
       background-color: rgba(0, 0, 0, 0.7);
     }
-    body.picking {
-      cursor: crosshair !important;
-    }
     /* Sadece menü açıkken canvas görünür olur, böylece alttaki uygulamalar tıklanmaz */
-    canvas {
-      display: none;
+    body.picking {
+      cursor: none !important;
     }
     body.picking canvas#screen-canvas {
+      display: block;
+    }
+
+    #custom-crosshair {
+      position: absolute;
+      pointer-events: none;
+      display: none;
+      z-index: 999;
+      width: 20px;
+      height: 20px;
+      transform: translate(-50%, -50%);
+    }
+
+    #custom-crosshair::before,
+    #custom-crosshair::after {
+      content: '';
+      position: absolute;
+      background: white;
+      box-shadow: 0 0 1px rgba(0,0,0,0.5);
+    }
+
+    /* Yatay çizgi */
+    #custom-crosshair::before {
+      top: 9px;
+      left: 0;
+      width: 20px;
+      height: 2px;
+    }
+
+    /* Dikey çizgi */
+    #custom-crosshair::after {
+      top: 0;
+      left: 9px;
+      width: 2px;
+      height: 20px;
+    }
+
+    body.picking #custom-crosshair {
       display: block;
     }
 
@@ -83,6 +118,8 @@
 </head>
 <body>
   <canvas id="screen-canvas"></canvas>
+
+  <div id="custom-crosshair"></div>
 
   <div id="lens-container">
     <div style="position: relative;">

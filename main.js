@@ -107,6 +107,9 @@ function openSettings() {
     pickerWindow.webContents.send('toggle-dim', true);
   }
 
+  // Kısayol değiştirirken uygulamanın tetiklenmemesi için tüm global kısayolları iptal et
+  globalShortcut.unregisterAll();
+
   settingsWindow = new BrowserWindow({
     width: 320,
     height: 130,
@@ -135,6 +138,10 @@ function openSettings() {
 
   settingsWindow.on('closed', () => {
     settingsWindow = null;
+    
+    // Ayarlar penceresi kapandığında kısayolu tekrar kaydet
+    registerShortcut();
+    
     if (pickerWindow) {
       pickerWindow.setIgnoreMouseEvents(true, { forward: true });
       pickerWindow.webContents.send('toggle-dim', false);
@@ -145,6 +152,7 @@ function openSettings() {
 let isPicking = false;
 
 const handleHotkey = async () => {
+  if (settingsWindow) return; // Ayar penceresi açıksa kısayolu yoksay
   if (isPicking) return; // Zaten seçim işlemi sürüyorsa (veya başlıyorsa) yoksay
   isPicking = true;
 
@@ -225,7 +233,11 @@ app.whenReady().then(() => {
   // İşletim sistemi başladığında otomatik çalıştır
   app.setLoginItemSettings({
     openAtLogin: true,
-    openAsHidden: true // Mac için arka planda sessizce açılmasını sağlar
+    openAsHidden: true, // Mac için arka planda sessizce açılmasını sağlar
+    args: [
+      '--processStart', `"${app.name}"`,
+      '--process-start-args', `"--hidden"`
+    ] // Windows için gizli başlatma parametreleri
   });
 });
 
