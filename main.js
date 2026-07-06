@@ -234,10 +234,7 @@ app.whenReady().then(() => {
   app.setLoginItemSettings({
     openAtLogin: true,
     openAsHidden: true, // Mac için arka planda sessizce açılmasını sağlar
-    args: [
-      '--processStart', `"${app.name}"`,
-      '--process-start-args', `"--hidden"`
-    ] // Windows için gizli başlatma parametreleri
+    args: ['--hidden'] // Windows için gizli başlatma parametresi
   });
 });
 
