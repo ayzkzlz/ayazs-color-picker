@@ -2,6 +2,9 @@ const { app, BrowserWindow, globalShortcut, desktopCapturer, ipcMain, clipboard,
 const path = require('path');
 const fs = require('fs');
 
+// Monitörler arası renk profili farklarından doğan 1 piksellik (#171717 vs #181818) kaymaları önler
+app.commandLine.appendSwitch('force-color-profile', 'srgb');
+
 let tray = null;
 let pickerWindow = null;
 let settingsWindow = null;
@@ -68,7 +71,9 @@ function createPickerWindow() {
     height: height + 1,
     icon: path.join(__dirname, 'icon.png'),
     frame: false,
-    transparent: true,
+    transparent: false,
+    show: false,
+    backgroundColor: '#000000',
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
@@ -86,10 +91,8 @@ function createPickerWindow() {
   });
 
   pickerWindow.setBounds({ x, y, width, height: height + 1 });
-  pickerWindow.setAlwaysOnTop(true, 'screen-saver');
 
   pickerWindow.loadFile('index.html');
-  pickerWindow.setIgnoreMouseEvents(true, { forward: true });
 
   pickerWindow.on('closed', () => {
     pickerWindow = null;
@@ -100,11 +103,6 @@ function openSettings() {
   if (settingsWindow) {
     settingsWindow.focus();
     return;
-  }
-  
-  if (pickerWindow) {
-    pickerWindow.setIgnoreMouseEvents(false);
-    pickerWindow.webContents.send('toggle-dim', true);
   }
 
   // Kısayol değiştirirken uygulamanın tetiklenmemesi için tüm global kısayolları iptal et
@@ -141,11 +139,6 @@ function openSettings() {
     
     // Ayarlar penceresi kapandığında kısayolu tekrar kaydet
     registerShortcut();
-    
-    if (pickerWindow) {
-      pickerWindow.setIgnoreMouseEvents(true, { forward: true });
-      pickerWindow.webContents.send('toggle-dim', false);
-    }
   });
 }
 
@@ -155,40 +148,40 @@ const handleHotkey = async () => {
   if (settingsWindow) return; // Ayar penceresi açıksa kısayolu yoksay
   if (isPicking) return; // Zaten seçim işlemi sürüyorsa (veya başlıyorsa) yoksay
   isPicking = true;
-
   if (pickerWindow) {
     try {
-      // MacOS Space/Sanal Masaüstü (üç parmak kaydırma) geçişlerinde pencere kaybolmasın diye
-      // her kısayola basıldığında pencereyi bulunulan ekrana ve en üste zorluyoruz.
-      pickerWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-      pickerWindow.setAlwaysOnTop(true, 'screen-saver', 2);
-      
       const { x: totalX, y: totalY, width: totalWidth, height: totalHeight, displays } = getTotalBounds();
       
       // Monitör değişimi/çözünürlük değişimi ihtimaline karşı bounds'u da yeniliyoruz
       pickerWindow.setBounds({ x: totalX, y: totalY, width: totalWidth, height: totalHeight + 1 });
 
-      let maxW = 0; let maxH = 0;
-      displays.forEach(d => {
-         const w = d.size.width * d.scaleFactor;
-         const h = d.size.height * d.scaleFactor;
-         if (w > maxW) maxW = w;
-         if (h > maxH) maxH = h;
-      });
-
-      const sources = await desktopCapturer.getSources({ 
-        types: ['screen'], 
-        thumbnailSize: { width: maxW, height: maxH } 
-      });
+      const screensData = [];
       
-      const screensData = displays.map((d, index) => {
-        let source = sources.find(s => s.display_id === d.id.toString());
-        if (!source) source = sources[index]; 
-        return {
-           imageUri: source.thumbnail.toDataURL(),
-           bounds: d.bounds
-        };
-      });
+      // Her monitörün resmini KENDİ orijinal çözünürlüğünde çekiyoruz.
+      // Eğer hepsini aynı boyutta çekmeye çalışırsak Electron küçük monitörü sündürür (scale up) 
+      // ve renk kodları bozulur (#181818 -> #171717 gibi).
+      for (const d of displays) {
+         const w = Math.round(d.size.width * d.scaleFactor);
+         const h = Math.round(d.size.height * d.scaleFactor);
+         
+         const sources = await desktopCapturer.getSources({ 
+           types: ['screen'], 
+           thumbnailSize: { width: w, height: h } 
+         });
+         
+         // Sadece bu monitöre ait olan görüntüyü alıyoruz (Böylece tam kendi boyutunda 1:1 alınmış oluyor, renk şaşmıyor)
+         let source = sources.find(s => s.display_id === d.id.toString());
+         if (!source && displays.length === sources.length) {
+            source = sources[displays.indexOf(d)];
+         }
+         
+         if (source) {
+           screensData.push({
+             imageUri: source.thumbnail.toDataURL(),
+             bounds: d.bounds
+           });
+         }
+      }
 
       pickerWindow.webContents.send('start-picking', screensData, { x: totalX, y: totalY, width: totalWidth, height: totalHeight }, lensEnabled);
     } catch (err) {
@@ -248,6 +241,9 @@ app.on('will-quit', () => {
 
 ipcMain.on('picking-ready', () => {
   if (pickerWindow) {
+    pickerWindow.showInactive();
+    pickerWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    pickerWindow.setAlwaysOnTop(true, 'screen-saver', 2);
     pickerWindow.setIgnoreMouseEvents(false);
   }
 });
@@ -255,6 +251,7 @@ ipcMain.on('picking-ready', () => {
 ipcMain.on('stop-picking', () => {
   isPicking = false;
   if (pickerWindow) {
+    pickerWindow.hide();
     pickerWindow.setIgnoreMouseEvents(true, { forward: true });
   }
 });
