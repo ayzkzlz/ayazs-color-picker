@@ -223,12 +223,14 @@ app.whenReady().then(() => {
 
   registerShortcut();
 
-  // İşletim sistemi başladığında otomatik çalıştır
-  app.setLoginItemSettings({
-    openAtLogin: true,
-    openAsHidden: true, // Mac için arka planda sessizce açılmasını sağlar
-    args: ['--hidden'] // Windows için gizli başlatma parametresi
-  });
+  // İşletim sistemi başladığında otomatik çalıştır (sadece derlenmiş gerçek sürümde)
+  if (app.isPackaged) {
+    app.setLoginItemSettings({
+      openAtLogin: true,
+      openAsHidden: true, // Mac için arka planda sessizce açılmasını sağlar
+      args: ['--hidden'] // Windows için gizli başlatma parametresi
+    });
+  }
 });
 
 app.on('window-all-closed', () => {
